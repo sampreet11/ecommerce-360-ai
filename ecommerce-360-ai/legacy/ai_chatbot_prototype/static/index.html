@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E-Commerce 360° Analytics Chat</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#18212f;background:#f4f6f9}
+body{margin:0;display:grid;place-items:center;min-height:100vh}.app{width:min(780px,94vw);height:min(780px,92vh);background:white;border:1px solid #dce2ea;border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px #1c2b4414}
+header{padding:20px 24px;border-bottom:1px solid #e8edf3}h1{font-size:20px;margin:0 0 5px}header p{margin:0;color:#64748b;font-size:13px}
+#messages{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:14px}.msg{max-width:88%;padding:12px 15px;border-radius:14px;white-space:pre-wrap;line-height:1.45;font-size:14px}.bot{background:#f0f4f8;align-self:flex-start}.user{background:#2457c5;color:white;align-self:flex-end}.basis{font-size:11px;color:#64748b;margin-top:8px}
+form{display:flex;gap:10px;padding:16px;border-top:1px solid #e8edf3}input{flex:1;min-width:0;padding:13px 14px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}button{border:0;background:#2457c5;color:white;border-radius:10px;padding:0 20px;font:inherit;font-weight:600;cursor:pointer}button:disabled{opacity:.5}
+.examples{padding:0 22px 12px;color:#64748b;font-size:12px}
+</style></head>
+<body><main class="app"><header><h1>E-Commerce 360° Analytics Chat</h1><p>Local data-grounded prototype · answers include their calculation basis</p></header>
+<div id="messages"><div class="msg bot">Hi! Ask me about sales, orders, categories, delivery, or repeat customers. Type “help” for examples.</div></div>
+<div class="examples">Example: “What is total revenue?” · “What is the late delivery rate?”</div>
+<form id="form"><input id="prompt" placeholder="Ask a business question…" autocomplete="off" maxlength="500" required><button id="send">Send</button></form></main>
+<script>
+const messages=document.querySelector('#messages'), form=document.querySelector('#form'), input=document.querySelector('#prompt'), send=document.querySelector('#send');
+function bubble(text,who,basis){const el=document.createElement('div');el.className='msg '+who;el.textContent=text;if(basis){const b=document.createElement('div');b.className='basis';b.textContent='Basis: '+basis;el.appendChild(b)}messages.appendChild(el);messages.scrollTop=messages.scrollHeight}
+form.addEventListener('submit',async e=>{e.preventDefault();const q=input.value.trim();if(!q)return;bubble(q,'user');input.value='';send.disabled=true;try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});const data=await r.json();bubble(data.answer||'No answer returned.','bot',data.basis)}catch(err){bubble('Could not reach the local API. Make sure the server is running.','bot')}finally{send.disabled=false;input.focus()}});
+</script></body></html>

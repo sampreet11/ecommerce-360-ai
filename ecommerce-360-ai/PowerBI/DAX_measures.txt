@@ -1,0 +1,136 @@
+
+-- Model assumes:
+-- FactSales = fact_sales.csv
+-- DimCustomer = customer_360.csv
+-- DimProduct = dim_product.csv
+-- DimDate = dim_date.csv
+-- DimSeller = dim_seller.csv
+-- DimDate[date] -> FactSales[order_purchase_timestamp] (date-only relationship)
+
+Total Sales =
+SUM(FactSales[sales])
+
+Total Freight =
+SUM(FactSales[freight_value])
+
+Gross Order Value =
+[Total Sales] + [Total Freight]
+
+Orders =
+DISTINCTCOUNT(FactSales[order_id])
+
+Customers =
+DISTINCTCOUNT(FactSales[customer_unique_id])
+
+AOV =
+DIVIDE([Total Sales], [Orders])
+
+Items =
+COUNTROWS(FactSales)
+
+Freight % of Sales =
+DIVIDE([Total Freight], [Total Sales])
+
+Previous Month Sales =
+CALCULATE(
+    [Total Sales],
+    DATEADD(DimDate[date], -1, MONTH)
+)
+
+MoM Growth % =
+DIVIDE(
+    [Total Sales] - [Previous Month Sales],
+    [Previous Month Sales]
+)
+
+YTD Sales =
+TOTALYTD([Total Sales], DimDate[date])
+
+Repeat Customers =
+CALCULATE(
+    DISTINCTCOUNT(DimCustomer[customer_unique_id]),
+    DimCustomer[repeat_flag] = TRUE()
+)
+
+Repeat Customer % =
+DIVIDE([Repeat Customers], [Customers])
+
+Repeat Customer Revenue =
+CALCULATE(
+    [Total Sales],
+    FactSales[customer_unique_id] IN
+        CALCULATETABLE(
+            VALUES(DimCustomer[customer_unique_id]),
+            DimCustomer[repeat_flag] = TRUE()
+        )
+)
+
+Repeat Revenue Share =
+DIVIDE([Repeat Customer Revenue], [Total Sales])
+
+-- Order-level delivery metrics. Each order contributes once.
+Late Orders =
+COUNTROWS(
+    FILTER(
+        SUMMARIZE(
+            FILTER(FactSales, FactSales[order_status] = "delivered"),
+            FactSales[order_id],
+            "OrderLate", MAX(FactSales[late_flag])
+        ),
+        [OrderLate] = TRUE()
+    )
+)
+
+Delivered Orders With Delivery Date =
+COUNTROWS(
+    FILTER(
+        SUMMARIZE(
+            FILTER(
+                FactSales,
+                FactSales[order_status] = "delivered"
+                    && NOT ISBLANK(FactSales[delivery_days])
+            ),
+            FactSales[order_id]
+        ),
+        NOT ISBLANK(CALCULATE(MAX(FactSales[delivery_days])))
+    )
+)
+
+Late Delivery Rate =
+DIVIDE([Late Orders], [Orders])
+
+Avg Delivery Days =
+AVERAGEX(
+    SUMMARIZE(
+        FILTER(
+            FactSales,
+            FactSales[order_status] = "delivered"
+                && NOT ISBLANK(FactSales[delivery_days])
+        ),
+        FactSales[order_id],
+        "OrderDeliveryDays", MAX(FactSales[delivery_days])
+    ),
+    [OrderDeliveryDays]
+)
+
+Revenue At Risk =
+CALCULATE(
+    [Total Sales],
+    DimCustomer[lifecycle] IN {"Lapsed ≥180d","Recently inactive 90–179d"}
+)
+
+High Value At Risk Revenue =
+CALCULATE(
+    [Total Sales],
+    DimCustomer[lifecycle] = "Lapsed ≥180d",
+    DimCustomer[revenue] >= PERCENTILEX.INC(ALL(DimCustomer), DimCustomer[revenue], 0.80)
+)
+
+Top Category Sales =
+MAXX(
+    VALUES(DimProduct[category]),
+    [Total Sales]
+)
+
+Sales Variance vs Previous Month =
+[Total Sales] - [Previous Month Sales]
